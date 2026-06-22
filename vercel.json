@@ -6,6 +6,11 @@
       "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "api/webhook.ts": {
+      "maxDuration": 90
+    }
+  },
   "routes": [
     {
       "src": "/api/webhook",

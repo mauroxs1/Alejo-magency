@@ -66,6 +66,11 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
 
   console.log(`Mensaje de ${incoming.from}: ${userText}`);
 
+  // Delay humano aleatorio: 20s, 35s o 60s
+  const delays = [20000, 35000, 60000];
+  const delay = delays[Math.floor(Math.random() * delays.length)];
+  await new Promise(resolve => setTimeout(resolve, delay));
+
   try {
     const { text, actions } = await getAlejosReply(incoming.from, userText);
     await sendTextMessage(incoming.from, text);
