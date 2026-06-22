@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { extractMessage, sendTextMessage, notifySaleToTeam, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
-import { addLead, updateLead } from "../src/sheets";
+import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
 import type { Action } from "../src/claude";
 
@@ -98,6 +98,8 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           action.estado,
           action.observaciones
         );
+      } else if (action.type === "registerSale") {
+        await registerSale(action as Parameters<typeof registerSale>[0]);
       } else if (action.type === "notificarVenta") {
         await notifySaleToTeam(action.detalle ?? "Sin detalle", fromPhone);
       }

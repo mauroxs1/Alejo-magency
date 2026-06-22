@@ -31,6 +31,51 @@ export async function addLead(data: LeadData): Promise<void> {
   });
 }
 
+interface SaleData {
+  nombre?: string;
+  apellido?: string;
+  dni?: string;
+  whatsapp?: string;
+  email?: string;
+  calle?: string;
+  ciudad?: string;
+  provincia?: string;
+  referencia?: string;
+  tipoEnvio?: string;
+  nombreLocal?: string;
+  mapLink?: string;
+  monto?: string;
+  alias?: string;
+  comprobanteOk?: string;
+  notas?: string;
+}
+
+export async function registerSale(data: SaleData): Promise<void> {
+  if (!SHEETS_URL) return;
+  const params = new URLSearchParams({
+    action: "registerSale",
+    nombre: data.nombre ?? "",
+    apellido: data.apellido ?? "",
+    dni: data.dni ?? "",
+    whatsapp: data.whatsapp ?? "",
+    email: data.email ?? "",
+    calle: data.calle ?? "",
+    ciudad: data.ciudad ?? "",
+    provincia: data.provincia ?? "",
+    referencia: data.referencia ?? "",
+    tipoEnvio: data.tipoEnvio ?? "domicilio",
+    nombreLocal: data.nombreLocal ?? "",
+    mapLink: data.mapLink ?? "",
+    monto: data.monto ?? "299000",
+    alias: data.alias ?? "mm.kit",
+    comprobanteOk: data.comprobanteOk ?? "Si",
+    notas: data.notas ?? "",
+  });
+  await axios.get(`${SHEETS_URL}?${params.toString()}`).catch((e) => {
+    console.error("Sheets registerSale error:", e?.message);
+  });
+}
+
 export async function updateLead(
   telefono: string,
   estado?: string,
