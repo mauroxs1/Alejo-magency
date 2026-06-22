@@ -4,15 +4,5 @@
     "api/webhook.ts": {
       "maxDuration": 90
     }
-  },
-  "routes": [
-    {
-      "src": "/api/webhook",
-      "dest": "/api/webhook.ts"
-    },
-    {
-      "src": "/api/privacy",
-      "dest": "/api/privacy.ts"
-    }
-  ]
+  }
 }
