@@ -43,25 +43,27 @@ export async function getAlejosReply(
   phoneNumber: string,
   incomingMessage: string
 ): Promise<ParsedResponse> {
-  const firstTime = isFirstContact(phoneNumber);
+  const firstTime = await isFirstContact(phoneNumber);
 
   const userContent = firstTime
-    ? `[PRIMER CONTACTO DE ESTE NÚMERO]\n${incomingMessage}`
+    ? `[PRIMER CONTACTO]\n${incomingMessage}`
     : incomingMessage;
 
-  addToHistory(phoneNumber, "user", userContent);
+  await addToHistory(phoneNumber, "user", userContent);
+
+  const history = await getHistory(phoneNumber);
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
     system: buildSystemPrompt(),
-    messages: getHistory(phoneNumber),
+    messages: history,
   });
 
   const fullText =
     response.content[0].type === "text" ? response.content[0].text : "";
 
-  addToHistory(phoneNumber, "assistant", fullText);
+  await addToHistory(phoneNumber, "assistant", fullText);
 
   return parseResponse(fullText);
 }
