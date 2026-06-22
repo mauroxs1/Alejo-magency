@@ -35,31 +35,31 @@ function handleVerification(req: VercelRequest, res: VercelResponse) {
 
 // Manejo de mensajes entrantes
 async function handleIncoming(req: VercelRequest, res: VercelResponse) {
-  // Meta espera 200 rápido — respondemos de inmediato y procesamos async
-  res.status(200).json({ status: "ok" });
-
   const incoming = extractMessage(req.body);
-  if (!incoming) return;
+
+  if (!incoming) {
+    return res.status(200).json({ status: "ok" });
+  }
 
   // Deduplicación
-  if (processedMessageIds.has(incoming.messageId)) return;
+  if (processedMessageIds.has(incoming.messageId)) {
+    return res.status(200).json({ status: "ok" });
+  }
   processedMessageIds.add(incoming.messageId);
-  // Limpiamos el set cada 1000 mensajes para no llenar memoria
   if (processedMessageIds.size > 1000) processedMessageIds.clear();
 
   console.log(`Mensaje de ${incoming.from}: ${incoming.text}`);
 
   try {
     const { text, actions } = await getAlejosReply(incoming.from, incoming.text);
-
-    // Enviamos la respuesta de Alejo
     await sendTextMessage(incoming.from, text);
-
-    // Ejecutamos las acciones del sistema
     await runActions(actions, incoming.from);
   } catch (error) {
     console.error("Error procesando mensaje:", error);
   }
+
+  // Respondemos a Meta al final — Vercel no mata la función hasta que retorna
+  return res.status(200).json({ status: "ok" });
 }
 
 async function runActions(actions: Action[], fromPhone: string): Promise<void> {
