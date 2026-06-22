@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractMessage, sendTextMessage, notifySaleToTeam } from "../src/whatsapp";
+import { extractMessage, sendTextMessage, notifySaleToTeam, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
 import { addLead, updateLead } from "../src/sheets";
+import { transcribeAudio } from "../src/transcribe";
 import type { Action } from "../src/claude";
 
 // IDs de mensajes ya procesados — evita duplicados por reintentos de Meta
@@ -48,10 +49,25 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   processedMessageIds.add(incoming.messageId);
   if (processedMessageIds.size > 1000) processedMessageIds.clear();
 
-  console.log(`Mensaje de ${incoming.from}: ${incoming.text}`);
+  let userText = incoming.text;
+
+  // Si es audio, transcribir con Groq Whisper
+  if (incoming.audioId) {
+    try {
+      const audioBuffer = await downloadAudio(incoming.audioId);
+      userText = await transcribeAudio(audioBuffer, incoming.audioMime ?? "audio/ogg");
+      console.log(`Audio transcripto de ${incoming.from}: ${userText}`);
+    } catch (err) {
+      console.error("Error transcribiendo audio:", err);
+      await sendTextMessage(incoming.from, "Perdón, no pude escuchar el audio. ¿Podés escribirme?");
+      return res.status(200).json({ status: "ok" });
+    }
+  }
+
+  console.log(`Mensaje de ${incoming.from}: ${userText}`);
 
   try {
-    const { text, actions } = await getAlejosReply(incoming.from, incoming.text);
+    const { text, actions } = await getAlejosReply(incoming.from, userText);
     await sendTextMessage(incoming.from, text);
     await runActions(actions, incoming.from);
   } catch (error) {

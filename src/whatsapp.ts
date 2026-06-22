@@ -37,11 +37,12 @@ export async function notifySaleToTeam(detail: string, clientPhone: string): Pro
   await Promise.allSettled(promises);
 }
 
-// Extrae el primer mensaje de texto de un payload de webhook de Meta
 export interface IncomingMessage {
   from: string;
   text: string;
   messageId: string;
+  audioId?: string;
+  audioMime?: string;
 }
 
 export function extractMessage(body: unknown): IncomingMessage | null {
@@ -55,16 +56,47 @@ export function extractMessage(body: unknown): IncomingMessage | null {
     if (!messages || messages.length === 0) return null;
 
     const msg = messages[0] as Record<string, unknown>;
-    if (msg.type !== "text") return null;
 
-    const textObj = msg.text as Record<string, unknown>;
+    if (msg.type === "text") {
+      const textObj = msg.text as Record<string, unknown>;
+      return {
+        from: msg.from as string,
+        text: textObj.body as string,
+        messageId: msg.id as string,
+      };
+    }
 
-    return {
-      from: msg.from as string,
-      text: textObj.body as string,
-      messageId: msg.id as string,
-    };
+    if (msg.type === "audio") {
+      const audioObj = msg.audio as Record<string, unknown>;
+      return {
+        from: msg.from as string,
+        text: "",
+        messageId: msg.id as string,
+        audioId: audioObj.id as string,
+        audioMime: (audioObj.mime_type as string) ?? "audio/ogg; codecs=opus",
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
+}
+
+export async function downloadAudio(mediaId: string): Promise<Buffer> {
+  const headers = { Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}` };
+
+  // 1. Obtener URL de descarga
+  const { data: mediaData } = await axios.get(
+    `${BASE_URL}/${mediaId}`,
+    { headers }
+  );
+
+  // 2. Descargar el archivo
+  const { data } = await axios.get(mediaData.url, {
+    headers,
+    responseType: "arraybuffer",
+  });
+
+  return Buffer.from(data);
 }

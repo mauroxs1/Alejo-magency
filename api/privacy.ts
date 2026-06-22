@@ -1,0 +1,23 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Política de Privacidad — Magency</title>
+<style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#333}h1{color:#111}</style>
+</head>
+<body>
+<h1>Política de Privacidad</h1>
+<p><strong>Magency</strong> (@magency.ar) utiliza WhatsApp Business API para brindar atención al cliente a través de su asistente virtual Alejo.</p>
+<h2>Datos que recopilamos</h2>
+<p>Al contactarte por WhatsApp recopilamos tu número de teléfono y el contenido de los mensajes enviados, con el único fin de responder tus consultas y registrar tu interés en nuestros servicios.</p>
+<h2>Uso de los datos</h2>
+<p>Usamos tu información para: (1) responder tus preguntas sobre servicios de Magency, (2) registrar potenciales clientes en nuestra base de datos interna, (3) enviarte información relevante sobre nuestros planes.</p>
+<h2>Compartir datos</h2>
+<p>No compartimos tu información personal con terceros. Los datos son almacenados en sistemas propios de Magency.</p>
+<h2>Contacto</h2>
+<p>Para consultas sobre privacidad escribinos a <a href="mailto:hola@magency.ar">hola@magency.ar</a> o por WhatsApp al +54 9 261 419 6629.</p>
+<p><em>Última actualización: junio 2026</em></p>
+</body></html>`);
+}
