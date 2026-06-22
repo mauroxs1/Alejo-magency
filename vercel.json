@@ -1,8 +1,18 @@
 {
   "version": 2,
-  "functions": {
-    "api/webhook.ts": {
-      "maxDuration": 90
+  "builds": [
+    {
+      "src": "api/webhook.ts",
+      "use": "@vercel/node",
+      "config": { "maxDuration": 60 }
+    },
+    {
+      "src": "api/privacy.ts",
+      "use": "@vercel/node"
     }
-  }
+  ],
+  "routes": [
+    { "src": "/api/webhook", "dest": "/api/webhook.ts" },
+    { "src": "/api/privacy", "dest": "/api/privacy.ts" }
+  ]
 }
