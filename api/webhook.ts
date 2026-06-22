@@ -104,7 +104,7 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           action.observaciones
         );
       } else if (action.type === "registerSale") {
-        await registerSale(action as Parameters<typeof registerSale>[0]);
+        await registerSale(action);
       } else if (action.type === "notificarVenta") {
         await notifySaleToTeam(action.detalle ?? "Sin detalle", fromPhone);
       }

@@ -12,8 +12,9 @@ export interface ParsedResponse {
 }
 
 export interface Action {
-  type: "addLead" | "updateLead" | "notificarVenta";
+  type: "addLead" | "updateLead" | "notificarVenta" | "registerSale";
   nombre?: string;
+  apellido?: string;
   telefono?: string;
   tipoLead?: string;
   rubro?: string;
@@ -22,6 +23,20 @@ export interface Action {
   estado?: string;
   observaciones?: string;
   detalle?: string;
+  dni?: string;
+  whatsapp?: string;
+  email?: string;
+  calle?: string;
+  ciudad?: string;
+  provincia?: string;
+  referencia?: string;
+  tipoEnvio?: string;
+  nombreLocal?: string;
+  mapLink?: string;
+  monto?: string;
+  alias?: string;
+  comprobanteOk?: string;
+  notas?: string;
 }
 
 export async function getAlejosReply(
