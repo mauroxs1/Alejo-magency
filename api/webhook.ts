@@ -5,6 +5,7 @@ import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
 import { analyzeReceipt } from "../src/analyzeReceipt";
 import { savePendingSale, getPendingSale, clearPendingSale, isTeamMember, isConfirmation } from "../src/pendingSales";
+import { getHistory } from "../src/conversation";
 import type { Action } from "../src/claude";
 
 const processedMessageIds = new Set<string>();
@@ -34,7 +35,31 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   processedMessageIds.add(incoming.messageId);
   if (processedMessageIds.size > 1000) processedMessageIds.clear();
 
-  // ── CASO 1: Miembro del equipo confirma venta pendiente ──────────
+  // ── CASO 1A: Equipo pide historial de un contacto ────────────────
+  if (isTeamMember(incoming.from) && incoming.text) {
+    const histMatch = incoming.text.trim().match(/^historial\s+(\d+)/i);
+    if (histMatch) {
+      const targetPhone = histMatch[1];
+      const history = await getHistory(targetPhone);
+      if (!history.length) {
+        await sendTextMessage(incoming.from, `No hay historial guardado para ${targetPhone}.`);
+      } else {
+        const lines = history.map((m) => {
+          const who = m.role === "user" ? "👤 Cliente" : "🤖 Alejo";
+          const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+          return `${who}: ${content}`;
+        });
+        // WhatsApp tiene límite de 4096 chars — enviamos en bloques si es necesario
+        const full = `📋 *Historial de ${targetPhone}*\n\n` + lines.join("\n\n");
+        const chunks: string[] = [];
+        for (let i = 0; i < full.length; i += 3800) chunks.push(full.slice(i, i + 3800));
+        for (const chunk of chunks) await sendTextMessage(incoming.from, chunk);
+      }
+      return res.status(200).json({ status: "ok" });
+    }
+  }
+
+  // ── CASO 1B: Miembro del equipo confirma venta pendiente ─────────
   if (isTeamMember(incoming.from) && incoming.text && isConfirmation(incoming.text)) {
     const pending = await getPendingSale();
     if (pending) {
@@ -103,8 +128,9 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   if (incoming.audioId) {
     try {
       const audioBuffer = await downloadAudio(incoming.audioId);
-      userText = await transcribeAudio(audioBuffer, incoming.audioMime ?? "audio/ogg");
-      console.log(`Audio transcripto de ${incoming.from}: ${userText}`);
+      const transcription = await transcribeAudio(audioBuffer, incoming.audioMime ?? "audio/ogg");
+      userText = `[AUDIO TRANSCRIPTO] ${transcription}`;
+      console.log(`Audio transcripto de ${incoming.from}: ${transcription}`);
     } catch (err) {
       console.error("Error transcribiendo audio:", err);
       await sendTextMessage(incoming.from, "Perdón, no pude escuchar el audio. ¿Podés escribirme?");
