@@ -24,16 +24,37 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
   );
 }
 
-export async function notifySaleToTeam(detail: string, clientPhone: string): Promise<void> {
+export async function notifyPendingSale(
+  clientPhone: string,
+  clientName: string,
+  saleData: Record<string, string>
+): Promise<void> {
   const mauro = process.env.MAURO_PHONE;
   const roberto = process.env.ROBERTO_PHONE;
 
-  const message = `🔔 *Nueva venta cerrada por Alejo*\n\nCliente: ${clientPhone}\nDetalle: ${detail}`;
+  const msg =
+    `🛒 *NUEVO PEDIDO KIT LIVE COMMERCE*\n\n` +
+    `👤 *${clientName}*\n` +
+    `📱 ${clientPhone}\n` +
+    `💰 Monto: $${saleData.monto ?? "299.000"}\n` +
+    `📦 Envío: ${saleData.tipoEnvio ?? "domicilio"} — ${saleData.ciudad ?? ""}, ${saleData.provincia ?? ""}\n\n` +
+    `✅ Comprobante verificado por Alejo.\n` +
+    `Revisá el banco (alias *mm.kit* / Roberto Oscar Martinez / Banco Nación).\n\n` +
+    `Respondé *SI* para confirmar y registrar el pedido.`;
 
+  const promises: Promise<void>[] = [];
+  if (mauro) promises.push(sendTextMessage(mauro, msg));
+  if (roberto) promises.push(sendTextMessage(roberto, msg));
+  await Promise.allSettled(promises);
+}
+
+export async function notifySaleToTeam(detail: string, clientPhone: string): Promise<void> {
+  const mauro = process.env.MAURO_PHONE;
+  const roberto = process.env.ROBERTO_PHONE;
+  const message = `🔔 *Nueva venta cerrada por Alejo*\n\nCliente: ${clientPhone}\nDetalle: ${detail}`;
   const promises: Promise<void>[] = [];
   if (mauro) promises.push(sendTextMessage(mauro, message));
   if (roberto) promises.push(sendTextMessage(roberto, message));
-
   await Promise.allSettled(promises);
 }
 
@@ -43,6 +64,9 @@ export interface IncomingMessage {
   messageId: string;
   audioId?: string;
   audioMime?: string;
+  mediaId?: string;
+  mediaType?: "image" | "document";
+  mediaMime?: string;
 }
 
 export function extractMessage(body: unknown): IncomingMessage | null {
@@ -59,21 +83,33 @@ export function extractMessage(body: unknown): IncomingMessage | null {
 
     if (msg.type === "text") {
       const textObj = msg.text as Record<string, unknown>;
-      return {
-        from: msg.from as string,
-        text: textObj.body as string,
-        messageId: msg.id as string,
-      };
+      return { from: msg.from as string, text: textObj.body as string, messageId: msg.id as string };
     }
 
     if (msg.type === "audio") {
       const audioObj = msg.audio as Record<string, unknown>;
       return {
-        from: msg.from as string,
-        text: "",
-        messageId: msg.id as string,
+        from: msg.from as string, text: "", messageId: msg.id as string,
         audioId: audioObj.id as string,
         audioMime: (audioObj.mime_type as string) ?? "audio/ogg; codecs=opus",
+      };
+    }
+
+    if (msg.type === "image") {
+      const obj = msg.image as Record<string, unknown>;
+      return {
+        from: msg.from as string, text: "", messageId: msg.id as string,
+        mediaId: obj.id as string, mediaType: "image",
+        mediaMime: (obj.mime_type as string) ?? "image/jpeg",
+      };
+    }
+
+    if (msg.type === "document") {
+      const obj = msg.document as Record<string, unknown>;
+      return {
+        from: msg.from as string, text: "", messageId: msg.id as string,
+        mediaId: obj.id as string, mediaType: "document",
+        mediaMime: (obj.mime_type as string) ?? "application/pdf",
       };
     }
 
@@ -83,20 +119,19 @@ export function extractMessage(body: unknown): IncomingMessage | null {
   }
 }
 
-export async function downloadAudio(mediaId: string): Promise<Buffer> {
+export async function downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const headers = { Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}` };
-
-  // 1. Obtener URL de descarga
-  const { data: mediaData } = await axios.get(
-    `${BASE_URL}/${mediaId}`,
-    { headers }
-  );
-
-  // 2. Descargar el archivo
-  const { data } = await axios.get(mediaData.url, {
-    headers,
-    responseType: "arraybuffer",
+  const { data: mediaData } = await axios.get(`${BASE_URL}/${mediaId}`, { headers });
+  const { data, headers: resHeaders } = await axios.get(mediaData.url, {
+    headers, responseType: "arraybuffer",
   });
+  return {
+    buffer: Buffer.from(data),
+    mimeType: (resHeaders["content-type"] as string) ?? mediaData.mime_type ?? "image/jpeg",
+  };
+}
 
-  return Buffer.from(data);
+export async function downloadAudio(mediaId: string): Promise<Buffer> {
+  const { buffer } = await downloadMedia(mediaId);
+  return buffer;
 }
