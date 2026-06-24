@@ -7,6 +7,7 @@ import { analyzeReceipt } from "../src/analyzeReceipt";
 import { savePendingSale, getPendingSale, clearPendingSale, isTeamMember, isConfirmation } from "../src/pendingSales";
 import { getHistory } from "../src/conversation";
 import { getUsageStats } from "../src/credits";
+import { logWeeklySale, logWeeklyLead } from "../src/weeklyLog";
 import type { Action } from "../src/claude";
 
 const processedMessageIds = new Set<string>();
@@ -90,6 +91,12 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
         monto: pending.monto, alias: "mm.kit", comprobanteOk: "Si", notas: pending.notas,
       });
       await clearPendingSale();
+
+      // Loguear para reporte semanal
+      logWeeklySale({
+        nombre: pending.nombre, apellido: pending.apellido,
+        ciudad: pending.ciudad, monto: pending.monto, whatsapp: pending.clientPhone,
+      }).catch(() => {});
 
       // Notificar a Mauro que la venta quedó registrada
       const mauro = process.env.MAURO_PHONE;
@@ -239,8 +246,26 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           tipoLead: action.tipoLead, rubro: action.rubro, instagram: action.instagram,
           planUpsell: action.planUpsell, estado: action.estado, observaciones: action.observaciones,
         });
+        // Loguear cierre de marketing para reporte semanal
+        if (action.estado === "Venta Cerrada") {
+          logWeeklyLead({
+            nombre: action.nombre ?? "Sin nombre",
+            telefono: action.telefono ?? fromPhone,
+            rubro: action.rubro ?? "—",
+            plan: action.planUpsell ?? "—",
+          }).catch(() => {});
+        }
       } else if (action.type === "updateLead") {
         await updateLead(action.telefono ?? fromPhone, action.estado, action.observaciones);
+        // Loguear si se marca como venta cerrada
+        if (action.estado === "Venta Cerrada") {
+          logWeeklyLead({
+            nombre: "Cliente",
+            telefono: action.telefono ?? fromPhone,
+            rubro: "—",
+            plan: "—",
+          }).catch(() => {});
+        }
       } else if (action.type === "registerSale") {
         // Guardar venta como pendiente hasta que Roberto/Mauro confirmen
         await savePendingSale({

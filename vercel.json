@@ -7,12 +7,24 @@
       "config": { "maxDuration": 60 }
     },
     {
+      "src": "api/weekly-report.ts",
+      "use": "@vercel/node",
+      "config": { "maxDuration": 30 }
+    },
+    {
       "src": "api/privacy.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     { "src": "/api/webhook", "dest": "/api/webhook.ts" },
+    { "src": "/api/weekly-report", "dest": "/api/weekly-report.ts" },
     { "src": "/api/privacy", "dest": "/api/privacy.ts" }
+  ],
+  "crons": [
+    {
+      "path": "/api/weekly-report",
+      "schedule": "0 11 * * 1"
+    }
   ]
 }
