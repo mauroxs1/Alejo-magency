@@ -131,7 +131,7 @@ export async function sendWeeklyReport(
   const html = buildHtml(sales, leads, weekLabel);
 
   const body = {
-    from: "Alejo Magency <alejo@magency.ar>",
+    from: "Alejo Magency <onboarding@resend.dev>",
     to: [to],
     subject: `📊 Resumen semanal Magency — ${weekLabel}`,
     html,
