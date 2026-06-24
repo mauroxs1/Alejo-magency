@@ -6,6 +6,7 @@ import { transcribeAudio } from "../src/transcribe";
 import { analyzeReceipt } from "../src/analyzeReceipt";
 import { savePendingSale, getPendingSale, clearPendingSale, isTeamMember, isConfirmation } from "../src/pendingSales";
 import { getHistory } from "../src/conversation";
+import { getUsageStats } from "../src/credits";
 import type { Action } from "../src/claude";
 
 const processedMessageIds = new Set<string>();
@@ -35,8 +36,25 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   processedMessageIds.add(incoming.messageId);
   if (processedMessageIds.size > 1000) processedMessageIds.clear();
 
-  // ── CASO 1A: Equipo pide historial de un contacto ────────────────
+  // ── CASO 1A: Equipo consulta créditos o historial ────────────────
   if (isTeamMember(incoming.from) && incoming.text) {
+    if (/^creditos?$/i.test(incoming.text.trim())) {
+      const stats = await getUsageStats();
+      const budget = parseFloat(process.env.ANTHROPIC_BUDGET_USD ?? "5");
+      const remaining = budget - stats.costUSD;
+      const pct = Math.round((stats.costUSD / budget) * 100);
+      const bar = "█".repeat(Math.round(pct / 10)) + "░".repeat(10 - Math.round(pct / 10));
+      await sendTextMessage(incoming.from,
+        `📊 *Créditos Alejo — Anthropic*\n\n` +
+        `${bar} ${pct}% usado\n\n` +
+        `💸 Gastado: $${stats.costUSD.toFixed(3)} USD\n` +
+        `💰 Disponible: ~$${remaining.toFixed(2)} USD\n` +
+        `🔢 Tokens: ${(stats.inputTokens + stats.outputTokens).toLocaleString()}\n\n` +
+        `_Recargá en: console.anthropic.com → Billing_`
+      );
+      return res.status(200).json({ status: "ok" });
+    }
+
     const histMatch = incoming.text.trim().match(/^historial\s+(\d+)/i);
     if (histMatch) {
       const targetPhone = histMatch[1];

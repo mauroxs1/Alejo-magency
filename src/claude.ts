@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "./systemPrompt";
 import { getHistory, addToHistory, isFirstContact } from "./conversation";
+import { trackUsage } from "./credits";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -51,11 +52,13 @@ export async function getAlejosReply(
 
   await addToHistory(phoneNumber, "user", userContent);
 
-  const history = await getHistory(phoneNumber);
+  // Máximo 20 mensajes de historial para ahorrar tokens
+  const fullHistory = await getHistory(phoneNumber);
+  const history = fullHistory.slice(-20);
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1024,
+    max_tokens: 800,
     system: buildSystemPrompt(),
     messages: history,
   });
@@ -64,6 +67,12 @@ export async function getAlejosReply(
     response.content[0].type === "text" ? response.content[0].text : "";
 
   await addToHistory(phoneNumber, "assistant", fullText);
+
+  // Trackear uso de tokens en background (no bloquea la respuesta)
+  trackUsage(
+    response.usage.input_tokens,
+    response.usage.output_tokens
+  ).catch(err => console.error("Error tracking usage:", err));
 
   return parseResponse(fullText);
 }
@@ -83,7 +92,6 @@ function parseResponse(raw: string): ParsedResponse {
     const parsed = JSON.parse(jsonPart);
     actions = parsed.actions ?? [];
   } catch {
-    // Si el JSON viene mal formado, ignoramos las acciones pero no rompemos
     console.error("Error parsing actions JSON:", jsonPart);
   }
 

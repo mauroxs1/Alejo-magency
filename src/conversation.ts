@@ -35,14 +35,14 @@ export async function addToHistory(
   if (!redis) {
     const history = memoryStore.get(phoneNumber) ?? [];
     history.push({ role, content });
-    if (history.length > 40) history.splice(0, history.length - 40);
+    if (history.length > 20) history.splice(0, history.length - 20);
     memoryStore.set(phoneNumber, history);
     return;
   }
 
   const history = await getHistory(phoneNumber);
   history.push({ role, content });
-  if (history.length > 40) history.splice(0, history.length - 40);
+  if (history.length > 20) history.splice(0, history.length - 20);
   await redis.set(HISTORY_KEY(phoneNumber), history, { ex: TTL_SECONDS });
 }
 
