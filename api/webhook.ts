@@ -86,33 +86,52 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
     try {
       const { buffer, mimeType } = await downloadMedia(incoming.mediaId);
       const analysis = await analyzeReceipt(buffer, mimeType);
+      const pending = await getPendingSale();
+      const clientName = pending?.clientPhone === incoming.from ? pending.nombre : null;
 
+      // ── PDF: no se puede analizar visualmente, derivar a equipo ──
+      if (analysis.isPdf) {
+        const roberto = process.env.ROBERTO_PHONE;
+        const mauro = process.env.MAURO_PHONE;
+        const msgEquipo =
+          `📄 *COMPROBANTE PDF RECIBIDO*\n\n` +
+          `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n\n` +
+          `No pude leer el PDF automáticamente.\n` +
+          `Revisá el banco (alias *mm.kit* / Roberto Oscar Martinez / Banco Nación).\n\n` +
+          `Respondé *SI, ME LLEGÓ* cuando confirmes el pago para que Alejo procese el pedido.`;
+        if (roberto) await sendTextMessage(roberto, msgEquipo);
+        if (mauro) await sendTextMessage(mauro, msgEquipo);
+        await sendTextMessage(
+          incoming.from,
+          `Recibí el PDF del comprobante 👌 Lo mandé al equipo para que lo revisen. En breve te confirmo el pedido.`
+        );
+        return res.status(200).json({ status: "ok" });
+      }
+
+      // ── Imagen válida ──────────────────────────────────────────────
       if (analysis.valid) {
-        // Buscar datos del pedido pendiente en la conversación (guardados en Redis)
-        const pending = await getPendingSale();
+        const roberto = process.env.ROBERTO_PHONE;
+        const mauro = process.env.MAURO_PHONE;
+        const msgEquipo =
+          `✅ *COMPROBANTE VERIFICADO POR ALEJO*\n\n` +
+          `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n` +
+          `💰 Monto: ${analysis.monto ?? "$299.000"}\n` +
+          `👤 Destinatario: ${analysis.destinatario ?? "Roberto Oscar Martinez"}\n` +
+          `🏦 Alias: ${analysis.alias ?? "mm.kit"}\n\n` +
+          `Revisá en el banco que haya llegado el pago.\n` +
+          `Respondé *SI, ME LLEGÓ* (o "si", "llegó", "ok") para confirmar el pedido al cliente.`;
+        if (roberto) await sendTextMessage(roberto, msgEquipo);
+        if (mauro) await sendTextMessage(mauro, msgEquipo);
+        await sendTextMessage(
+          incoming.from,
+          `¡Perfecto${clientName ? `, ${clientName}` : ""}! Revisé el comprobante y los datos coinciden ✅ Le avisé al equipo para que confirmen que llegó el dinero al banco. En unos minutos te confirmo el pedido.`
+        );
 
-        if (pending && pending.clientPhone === incoming.from) {
-          // Notificar al equipo para que confirmen en el banco
-          await notifyPendingSale(incoming.from, pending.clientName, {
-            monto: pending.monto, tipoEnvio: pending.tipoEnvio,
-            ciudad: pending.ciudad, provincia: pending.provincia,
-          });
-          await sendTextMessage(
-            incoming.from,
-            `¡Gracias ${pending.nombre}! Vi el comprobante y todo parece estar en orden 💪 Le avisé al equipo para que confirmen que llegó el dinero al banco. En unos minutos te confirmo el pedido.`
-          );
-        } else {
-          // Comprobante sin pedido previo registrado — igual notificamos
-          await notifySaleToTeam(`Comprobante recibido de ${incoming.from}. Monto: ${analysis.monto ?? "?"} — Destinatario: ${analysis.destinatario ?? "?"}. Verificar manualmente.`, incoming.from);
-          await sendTextMessage(
-            incoming.from,
-            "¡Recibí el comprobante! El equipo lo está revisando y te confirma en breve 🙌"
-          );
-        }
+      // ── Imagen inválida ────────────────────────────────────────────
       } else {
         await sendTextMessage(
           incoming.from,
-          `Mmm, el comprobante no parece coincidir con los datos del pago. ${analysis.motivo ?? ""} ¿Podés reenviar el comprobante correcto? La transferencia tiene que ser de $299.000 al alias *mm.kit* (Roberto Oscar Martinez — Banco Nación).`
+          `Mmm, algo no cuadra con el comprobante 🤔 ${analysis.motivo ?? ""}\n\nLa transferencia tiene que ser de *$299.000* al alias *mm.kit* (Roberto Oscar Martinez — Banco Nación). ¿Podés mandar de nuevo el comprobante correcto?`
         );
       }
     } catch (err) {

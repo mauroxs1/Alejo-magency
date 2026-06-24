@@ -52,6 +52,11 @@ export function isTeamMember(phone: string): boolean {
 }
 
 export function isConfirmation(text: string): boolean {
-  const t = text.toLowerCase().trim();
-  return ["si", "sí", "ok", "yes", "confirmo", "confirmado", "dale"].some(w => t.includes(w));
+  const t = text.toLowerCase().trim()
+    .normalize("NFD").replace(/[̀-ͯ]/g, ""); // quitar tildes para comparar
+  return [
+    "si", "sí", "ok", "yes", "dale", "confirmo", "confirmado",
+    "llego", "llegó", "me llego", "me llegó", "llego el pago",
+    "llegó el pago", "confirmar", "listo", "aparecio", "apareció",
+  ].some(w => t.includes(w.normalize("NFD").replace(/[̀-ͯ]/g, "")));
 }

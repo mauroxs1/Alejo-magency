@@ -6,23 +6,29 @@ export interface ReceiptAnalysis {
   valid: boolean;
   monto?: string;
   destinatario?: string;
-  motivo?: string; // si no es válido, por qué
+  alias?: string;
+  motivo?: string;
+  isPdf?: boolean;
 }
 
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
 export async function analyzeReceipt(
-  imageBuffer: Buffer,
+  mediaBuffer: Buffer,
   mimeType: string
 ): Promise<ReceiptAnalysis> {
-  // Solo imágenes soportadas por Claude Vision (PDF no soportado directamente)
-  const supportedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
   const cleanMime = mimeType.split(";")[0].trim();
 
-  if (!supportedTypes.includes(cleanMime)) {
-    // PDF u otro formato — no podemos analizarlo visualmente, lo damos por válido pending
-    return { valid: true, motivo: "PDF no analizable visualmente — verificar manualmente" };
+  // ── PDF: no se puede analizar con vision — notificar manual pero NO auto-aprobar
+  if (!SUPPORTED_IMAGE_TYPES.includes(cleanMime)) {
+    return {
+      valid: false,
+      isPdf: true,
+      motivo: "PDF recibido — se reenvía al equipo para verificación manual",
+    };
   }
 
-  const base64 = imageBuffer.toString("base64");
+  const base64 = mediaBuffer.toString("base64");
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -33,32 +39,37 @@ export async function analyzeReceipt(
         content: [
           {
             type: "image",
-            source: { type: "base64", media_type: cleanMime as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64 },
+            source: {
+              type: "base64",
+              media_type: cleanMime as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+              data: base64,
+            },
           },
           {
             type: "text",
-            text: `Analizá este comprobante de transferencia bancaria.
-Verificá si cumple TODAS estas condiciones:
-1. Es una transferencia bancaria real (no una captura de saldo ni otro documento)
-2. El monto es de $299.000 (pesos argentinos, puede tener puntos o comas)
-3. El destinatario es "Roberto Oscar Martinez" o similar, cuenta Banco Nación, alias mm.kit
+            text: `Analizá esta imagen. ¿Es un comprobante de transferencia bancaria?
 
-Respondé SOLO con este JSON (sin texto extra):
-{"valid": true/false, "monto": "valor que ves", "destinatario": "nombre que ves", "motivo": "si es inválido, explicá por qué brevemente"}`,
+Verificá si cumple TODAS estas condiciones:
+1. Es una transferencia bancaria completada (no un saldo, no una promesa, no un error)
+2. El monto transferido es $299.000 pesos argentinos (puede tener punto o coma como separador)
+3. El destinatario es "Roberto Oscar Martinez" o nombre muy similar, con cuenta en Banco Nación o alias mm.kit
+
+Respondé SOLO con este JSON sin texto extra:
+{"valid": true/false, "monto": "monto que ves exactamente", "destinatario": "nombre que ves exactamente", "alias": "alias o CBU si ves", "motivo": "si es inválido, explicá en una línea por qué"}`,
           },
         ],
       },
     ],
   });
 
-  const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
 
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]) as ReceiptAnalysis;
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]) as ReceiptAnalysis;
   } catch {
-    // fallback
+    // ignorar error de parseo
   }
 
-  return { valid: false, motivo: "No se pudo analizar el comprobante" };
+  return { valid: false, motivo: "No se pudo interpretar el comprobante" };
 }
