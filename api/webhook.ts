@@ -96,61 +96,72 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
 
   // ── CASO 2: Comprobante de pago (imagen o documento) ────────────
   if (incoming.mediaId) {
+    const roberto = process.env.ROBERTO_PHONE!;
+    const mauro = process.env.MAURO_PHONE!;
+
     try {
       const { buffer, mimeType } = await downloadMedia(incoming.mediaId);
       const analysis = await analyzeReceipt(buffer, mimeType);
       const pending = await getPendingSale();
       const clientName = pending?.clientPhone === incoming.from ? pending.nombre : null;
+      const clientLabel = clientName ? ` (${clientName})` : "";
 
-      // ── PDF: no se puede analizar visualmente, derivar a Roberto ──
+      // ── PDF ────────────────────────────────────────────────────────
       if (analysis.isPdf) {
-        const roberto = process.env.ROBERTO_PHONE;
-        const mauro = process.env.MAURO_PHONE;
-        const msgRoberto =
+        await sendTextMessage(roberto,
           `📄 *COMPROBANTE PDF — KIT LIVE COMMERCE*\n\n` +
-          `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n\n` +
-          `No pude leer el PDF automáticamente.\n` +
-          `Revisá en el banco el alias *mm.kit*.\n\n` +
-          `Respondé *SI, ME LLEGÓ* para confirmar el pedido.`;
-        if (roberto) await sendTextMessage(roberto, msgRoberto);
-        if (mauro && clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit Live Commerce*\nCliente: ${clientName} (${incoming.from})\nEsperando confirmación de Roberto.`);
-        await sendTextMessage(
-          incoming.from,
-          `Recibí el PDF del comprobante 👌 Roberto lo está revisando, en breve te confirmo el pedido.`
+          `📱 Cliente: ${incoming.from}${clientLabel}\n\n` +
+          `No pude leer el PDF. Revisá en el banco el alias *mm.kit*.\n\n` +
+          `Respondé *SI, ME LLEGÓ* para confirmar el pedido.`
         );
+        if (clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit*\nCliente: ${clientName} (${incoming.from})\nEsperando confirmación de Roberto.`);
+        await sendTextMessage(incoming.from, `Recibí el comprobante 👌 Roberto lo está revisando, en breve te confirmo.`);
         return res.status(200).json({ status: "ok" });
       }
 
-      // ── Imagen válida ──────────────────────────────────────────────
+      // ── Imagen: SIEMPRE notificar a Roberto, pase lo que pase ─────
       if (analysis.valid) {
-        const roberto = process.env.ROBERTO_PHONE;
-        const mauro = process.env.MAURO_PHONE;
-        const msgRoberto =
+        // Comprobante OK
+        await sendTextMessage(roberto,
           `✅ *COMPROBANTE VERIFICADO — KIT LIVE COMMERCE*\n\n` +
-          `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n` +
+          `📱 Cliente: ${incoming.from}${clientLabel}\n` +
           `💰 Monto: ${analysis.monto ?? "$299.000"}\n` +
           `👤 Destinatario: ${analysis.destinatario ?? "Roberto Oscar Martinez"}\n` +
           `🏦 Alias: ${analysis.alias ?? "mm.kit"}\n\n` +
           `Revisá en el banco que haya llegado el pago.\n` +
-          `Respondé *SI, ME LLEGÓ* (o "si", "llegó", "ok") para confirmar.`;
-        if (roberto) await sendTextMessage(roberto, msgRoberto);
-        if (mauro && clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit Live Commerce*\nCliente: ${clientName} (${incoming.from})\nComprobante verificado. Esperando confirmación de Roberto.`);
-        await sendTextMessage(
-          incoming.from,
-          `¡Perfecto${clientName ? `, ${clientName}` : ""}! Revisé el comprobante y los datos coinciden ✅ Roberto está revisando que llegó el pago al banco. En unos minutos te confirmo el pedido.`
+          `Respondé *SI, ME LLEGÓ* para confirmar.`
         );
-
-      // ── Imagen inválida ────────────────────────────────────────────
+        if (clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit*\nCliente: ${clientName} (${incoming.from})\nComprobante OK. Esperando confirmación de Roberto.`);
+        await sendTextMessage(incoming.from,
+          `¡Perfecto${clientName ? `, ${clientName}` : ""}! Revisé el comprobante y todo parece estar en orden ✅ Le avisé a Roberto para que confirme que llegó el pago al banco. En unos minutos te confirmo el pedido.`
+        );
       } else {
-        await sendTextMessage(
-          incoming.from,
-          `Mmm, algo no cuadra con el comprobante 🤔 ${analysis.motivo ?? ""}\n\nLa transferencia tiene que ser de *$299.000* al alias *mm.kit* (Roberto Oscar Martinez — Banco Nación). ¿Podés mandar de nuevo el comprobante correcto?`
+        // Comprobante con observaciones — Roberto igual se entera
+        await sendTextMessage(roberto,
+          `⚠️ *COMPROBANTE RECIBIDO — REVISAR MANUALMENTE*\n\n` +
+          `📱 Cliente: ${incoming.from}${clientLabel}\n` +
+          `❓ Observación de Alejo: ${analysis.motivo ?? "No coinciden los datos"}\n` +
+          `💰 Monto detectado: ${analysis.monto ?? "no legible"}\n` +
+          `👤 Destinatario detectado: ${analysis.destinatario ?? "no legible"}\n\n` +
+          `Revisá el banco igual. Respondé *SI, ME LLEGÓ* si el pago está y querés confirmar.`
+        );
+        await sendTextMessage(incoming.from,
+          `Mmm, algo no cuadra con el comprobante 🤔 ${analysis.motivo ?? ""}\n\nLa transferencia tiene que ser de *$299.000* al alias *mm.kit* (Roberto Oscar Martinez — Banco Nación). ¿Podés mandarlo de nuevo?`
         );
       }
+
     } catch (err) {
+      // Error técnico — igual avisamos a Roberto para que no se pierda nada
       console.error("Error analizando comprobante:", err);
-      await sendTextMessage(incoming.from, "No pude leer el comprobante. ¿Podés mandarlo de nuevo?");
+      await sendTextMessage(roberto,
+        `⚠️ *COMPROBANTE RECIBIDO — ERROR AL ANALIZAR*\n\n` +
+        `📱 Cliente: ${incoming.from}\n\n` +
+        `Alejo no pudo procesar el archivo. Revisá el banco manualmente (alias *mm.kit*).\n` +
+        `Respondé *SI, ME LLEGÓ* para confirmar el pedido.`
+      ).catch(() => {});
+      await sendTextMessage(incoming.from, "Recibí el comprobante 👌 El equipo lo está revisando, en breve te confirmo.");
     }
+
     return res.status(200).json({ status: "ok" });
   }
 
