@@ -59,8 +59,8 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ── CASO 1B: Miembro del equipo confirma venta pendiente ─────────
-  if (isTeamMember(incoming.from) && incoming.text && isConfirmation(incoming.text)) {
+  // ── CASO 1B: Roberto confirma pago recibido ──────────────────────
+  if (incoming.from === process.env.ROBERTO_PHONE && incoming.text && isConfirmation(incoming.text)) {
     const pending = await getPendingSale();
     if (pending) {
       await registerSale({
@@ -72,11 +72,24 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
         monto: pending.monto, alias: "mm.kit", comprobanteOk: "Si", notas: pending.notas,
       });
       await clearPendingSale();
-      await sendTextMessage(
-        pending.clientPhone,
-        `✅ ¡${pending.nombre}, tu pedido está confirmado! El Kit Live Commerce está en camino. Te llega en 3 a 5 días hábiles.${pending.tipoEnvio !== "domicilio" ? "" : ""} ¡Cualquier consulta estoy por acá!`
-      );
-      await sendTextMessage(incoming.from, `✅ Venta de ${pending.nombre} registrada y confirmada al cliente.`);
+
+      // Notificar a Mauro que la venta quedó registrada
+      const mauro = process.env.MAURO_PHONE;
+      if (mauro) await sendTextMessage(mauro, `✅ *Venta registrada — Kit Live Commerce*\nCliente: ${pending.nombre} ${pending.apellido} (${pending.clientPhone})\nConfirmada por Roberto. Cargada en Google Sheets.`);
+
+      // Mensaje de bienvenida completo al cliente
+      const saludo = getSaludo();
+      const msgCliente =
+        `${saludo} ${pending.nombre}! 🎉\n\n` +
+        `*¡Bienvenido/a al Kit Live Commerce!* Tu pedido está *confirmado* y ya está en preparación.\n\n` +
+        `📦 Tu kit llega en *3 a 5 días hábiles*${pending.ciudad ? ` a ${pending.ciudad}` : ""}.\n\n` +
+        `Dentro del kit vas a encontrar el código de acceso a la *academia online* donde aprendés a usarlo paso a paso desde cero.\n\n` +
+        `Cualquier consulta sobre el kit, el envío o el curso, no dudes en escribirnos por acá. ¡Estamos para ayudarte! 🚀`;
+      await sendTextMessage(pending.clientPhone, msgCliente);
+      await sendTextMessage(incoming.from, `✅ Listo Roberto. Venta de ${pending.nombre} registrada. Le mandé la confirmación al cliente.`);
+      return res.status(200).json({ status: "ok" });
+    } else {
+      await sendTextMessage(incoming.from, "No hay ninguna venta pendiente para confirmar en este momento.");
       return res.status(200).json({ status: "ok" });
     }
   }
@@ -89,21 +102,21 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
       const pending = await getPendingSale();
       const clientName = pending?.clientPhone === incoming.from ? pending.nombre : null;
 
-      // ── PDF: no se puede analizar visualmente, derivar a equipo ──
+      // ── PDF: no se puede analizar visualmente, derivar a Roberto ──
       if (analysis.isPdf) {
         const roberto = process.env.ROBERTO_PHONE;
         const mauro = process.env.MAURO_PHONE;
-        const msgEquipo =
-          `📄 *COMPROBANTE PDF RECIBIDO*\n\n` +
+        const msgRoberto =
+          `📄 *COMPROBANTE PDF — KIT LIVE COMMERCE*\n\n` +
           `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n\n` +
           `No pude leer el PDF automáticamente.\n` +
-          `Revisá el banco (alias *mm.kit* / Roberto Oscar Martinez / Banco Nación).\n\n` +
-          `Respondé *SI, ME LLEGÓ* cuando confirmes el pago para que Alejo procese el pedido.`;
-        if (roberto) await sendTextMessage(roberto, msgEquipo);
-        if (mauro) await sendTextMessage(mauro, msgEquipo);
+          `Revisá en el banco el alias *mm.kit*.\n\n` +
+          `Respondé *SI, ME LLEGÓ* para confirmar el pedido.`;
+        if (roberto) await sendTextMessage(roberto, msgRoberto);
+        if (mauro && clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit Live Commerce*\nCliente: ${clientName} (${incoming.from})\nEsperando confirmación de Roberto.`);
         await sendTextMessage(
           incoming.from,
-          `Recibí el PDF del comprobante 👌 Lo mandé al equipo para que lo revisen. En breve te confirmo el pedido.`
+          `Recibí el PDF del comprobante 👌 Roberto lo está revisando, en breve te confirmo el pedido.`
         );
         return res.status(200).json({ status: "ok" });
       }
@@ -112,19 +125,19 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
       if (analysis.valid) {
         const roberto = process.env.ROBERTO_PHONE;
         const mauro = process.env.MAURO_PHONE;
-        const msgEquipo =
-          `✅ *COMPROBANTE VERIFICADO POR ALEJO*\n\n` +
+        const msgRoberto =
+          `✅ *COMPROBANTE VERIFICADO — KIT LIVE COMMERCE*\n\n` +
           `📱 Cliente: ${incoming.from}${clientName ? ` (${clientName})` : ""}\n` +
           `💰 Monto: ${analysis.monto ?? "$299.000"}\n` +
           `👤 Destinatario: ${analysis.destinatario ?? "Roberto Oscar Martinez"}\n` +
           `🏦 Alias: ${analysis.alias ?? "mm.kit"}\n\n` +
           `Revisá en el banco que haya llegado el pago.\n` +
-          `Respondé *SI, ME LLEGÓ* (o "si", "llegó", "ok") para confirmar el pedido al cliente.`;
-        if (roberto) await sendTextMessage(roberto, msgEquipo);
-        if (mauro) await sendTextMessage(mauro, msgEquipo);
+          `Respondé *SI, ME LLEGÓ* (o "si", "llegó", "ok") para confirmar.`;
+        if (roberto) await sendTextMessage(roberto, msgRoberto);
+        if (mauro && clientName) await sendTextMessage(mauro, `🔔 *Nueva venta Kit Live Commerce*\nCliente: ${clientName} (${incoming.from})\nComprobante verificado. Esperando confirmación de Roberto.`);
         await sendTextMessage(
           incoming.from,
-          `¡Perfecto${clientName ? `, ${clientName}` : ""}! Revisé el comprobante y los datos coinciden ✅ Le avisé al equipo para que confirmen que llegó el dinero al banco. En unos minutos te confirmo el pedido.`
+          `¡Perfecto${clientName ? `, ${clientName}` : ""}! Revisé el comprobante y los datos coinciden ✅ Roberto está revisando que llegó el pago al banco. En unos minutos te confirmo el pedido.`
         );
 
       // ── Imagen inválida ────────────────────────────────────────────
@@ -175,6 +188,17 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(200).json({ status: "ok" });
+}
+
+function getSaludo(): string {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Mendoza" }));
+  const hora = now.getHours();
+  const dia = now.getDay(); // 0=dom, 6=sab
+  if (dia === 0) return "¡Feliz domingo";
+  if (dia === 6) return "¡Feliz sábado";
+  if (hora >= 6 && hora < 12) return "¡Buenos días";
+  if (hora >= 12 && hora < 19) return "¡Buenas tardes";
+  return "¡Buenas noches";
 }
 
 async function runActions(actions: Action[], fromPhone: string): Promise<void> {
