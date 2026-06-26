@@ -48,14 +48,60 @@ export async function notifyPendingSale(
   await Promise.allSettled(promises);
 }
 
+async function sendTemplate(
+  to: string,
+  templateName: string,
+  parameters: string[]
+): Promise<void> {
+  const phoneNumberId = process.env.PHONE_NUMBER_ID;
+  await axios.post(
+    `${BASE_URL}/${phoneNumberId}/messages`,
+    {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "es_ES" },
+        components: [
+          {
+            type: "body",
+            parameters: parameters.map(p => ({ type: "text", text: p })),
+          },
+        ],
+      },
+    },
+    { headers: getHeaders() }
+  );
+}
+
 export async function notifySaleToTeam(detail: string, clientPhone: string): Promise<void> {
   const mauro = process.env.MAURO_PHONE;
   const roberto = process.env.ROBERTO_PHONE;
-  const message = `🔔 *Nueva venta cerrada por Alejo*\n\nCliente: ${clientPhone}\nDetalle: ${detail}`;
-  const promises: Promise<void>[] = [];
-  if (mauro) promises.push(sendTextMessage(mauro, message));
-  if (roberto) promises.push(sendTextMessage(roberto, message));
-  await Promise.allSettled(promises);
+  const targets = [mauro, roberto].filter(Boolean) as string[];
+
+  // Intentar con template primero (sin restricción 24h), fallback a texto normal
+  await Promise.allSettled(
+    targets.map(to =>
+      sendTemplate(to, "alejo_cierre_marketing", [clientPhone, clientPhone, "—", detail])
+        .catch(() => sendTextMessage(to, `🔔 *Venta cerrada por Alejo*\n\nCliente: ${clientPhone}\nDetalle: ${detail}`))
+    )
+  );
+}
+
+export async function notifyKitSaleToTeam(
+  nombre: string, telefono: string, ciudad: string
+): Promise<void> {
+  const mauro = process.env.MAURO_PHONE;
+  const roberto = process.env.ROBERTO_PHONE;
+  const targets = [mauro, roberto].filter(Boolean) as string[];
+
+  await Promise.allSettled(
+    targets.map(to =>
+      sendTemplate(to, "alejo_cierre_kit", [nombre, telefono, ciudad])
+        .catch(() => sendTextMessage(to, `🛒 *Venta Kit cerrada por Alejo*\n\nCliente: ${nombre}\nTeléfono: ${telefono}\nCiudad: ${ciudad}\n💰 $299.000`))
+    )
+  );
 }
 
 export interface IncomingMessage {

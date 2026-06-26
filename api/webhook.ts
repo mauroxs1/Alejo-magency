@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractMessage, sendTextMessage, notifySaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
+import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
 import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
@@ -98,9 +98,12 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
         ciudad: pending.ciudad, monto: pending.monto, whatsapp: pending.clientPhone,
       }).catch(() => {});
 
-      // Notificar a Mauro que la venta quedó registrada
-      const mauro = process.env.MAURO_PHONE;
-      if (mauro) await sendTextMessage(mauro, `✅ *Venta registrada — Kit Live Commerce*\nCliente: ${pending.nombre} ${pending.apellido} (${pending.clientPhone})\nConfirmada por Roberto. Cargada en Google Sheets.`);
+      // Notificar a Mauro y Roberto via template (sin restricción 24h)
+      await notifyKitSaleToTeam(
+        `${pending.nombre} ${pending.apellido}`,
+        pending.clientPhone,
+        pending.ciudad || "Mendoza"
+      );
 
       // Mensaje de bienvenida completo al cliente
       const saludo = getSaludo();
