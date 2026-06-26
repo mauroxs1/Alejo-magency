@@ -87,7 +87,7 @@ Un agente AI es un asistente inteligente que funciona directamente en WhatsApp B
 
 ### Planes AI Agents
 
-**AI STARTER — $300.000/mes**
+**AI STARTER — $150.000 setup único + $300.000/mes**
 Para negocios que quieren automatizar la atención básica y el registro de clientes.
 Incluye:
 - Agente activo 24/7 en WhatsApp
@@ -100,7 +100,7 @@ Incluye:
 - Setup en 7 días hábiles
 - Soporte incluido
 
-**AI FULL — $600.000/mes**
+**AI FULL — $250.000 setup único + $600.000/mes**
 Para negocios con mayor volumen, flujos de venta más complejos o múltiples productos.
 Incluye todo AI STARTER más:
 - Análisis de comprobantes de pago con visión artificial
