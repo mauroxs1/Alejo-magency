@@ -9,6 +9,12 @@ import { getHistory } from "../src/conversation";
 import { getUsageStats } from "../src/credits";
 import { logWeeklySale, logWeeklyLead } from "../src/weeklyLog";
 import type { Action } from "../src/claude";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 const processedMessageIds = new Set<string>();
 
@@ -96,7 +102,7 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   processedMessageIds.add(incoming.messageId);
   if (processedMessageIds.size > 1000) processedMessageIds.clear();
 
-  // ── CASO 1A: Equipo consulta créditos o historial ────────────────
+  // ── CASO 1A: Equipo — solo comandos del sistema, nunca IA ──────────
   if (isTeamMember(incoming.from) && incoming.text) {
     if (/^creditos?$/i.test(incoming.text.trim())) {
       const stats = await getUsageStats();
@@ -127,7 +133,6 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
           const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
           return `${who}: ${content}`;
         });
-        // WhatsApp tiene límite de 4096 chars — enviamos en bloques si es necesario
         const full = `📋 *Historial de ${targetPhone}*\n\n` + lines.join("\n\n");
         const chunks: string[] = [];
         for (let i = 0; i < full.length; i += 3800) chunks.push(full.slice(i, i + 3800));
@@ -135,6 +140,9 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
       }
       return res.status(200).json({ status: "ok" });
     }
+
+    // Cualquier otro mensaje del equipo → silencio total. Alejo solo atiende clientes.
+    return res.status(200).json({ status: "ok" });
   }
 
   // ── CASO 1B: Roberto confirma pago recibido ──────────────────────
@@ -277,8 +285,25 @@ async function handleIncoming(req: VercelRequest, res: VercelResponse) {
   const delay = delays[Math.floor(Math.random() * delays.length)];
   await new Promise(resolve => setTimeout(resolve, delay));
 
+  // Inyectar contexto de prospecto si este número fue contactado por la campaña
+  let prospectContext = "";
   try {
-    const { text, actions } = await getAlejosReply(incoming.from, userText);
+    const prospectData = await redis.get<{ nombre: string; rubro: string; rubroSlug: string; fit: string }>(
+      `alejo:prospect:${incoming.from}`
+    );
+    if (prospectData) {
+      prospectContext =
+        `\n\n[CONTEXTO SISTEMA: Este número corresponde a "${prospectData.nombre}", un comercio de rubro "${prospectData.rubro}" ` +
+        `contactado por la campaña de prospección de Magency. ` +
+        `Afinidad al Kit Live Commerce: ${prospectData.fit === "kit" ? "ALTA — ofrecé Kit primero" : prospectData.fit === "marketing" ? "BAJA — evaluá plan de marketing o agente AI" : "MEDIA — analizá en la conversación"}. ` +
+        `Ya conocen Magency por el mensaje que recibieron. No te presentes de cero — respondé como si fuera una conversación que ya empezó.]`;
+    }
+  } catch {
+    // Si falla Redis no interrumpimos
+  }
+
+  try {
+    const { text, actions } = await getAlejosReply(incoming.from, userText + prospectContext);
     await sendTextMessage(incoming.from, text);
     await runActions(actions, incoming.from);
   } catch (error) {
