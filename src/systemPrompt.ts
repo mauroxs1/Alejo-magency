@@ -191,7 +191,8 @@ El Kit incluye Kit físico + Curso online, todo por $299.000. Son inseparables, 
 1. Presentar el producto: qué incluye, para qué sirve, precio $299.000.
 2. Mandar al usuario a la landing: ${kitLanding}
 3. Explicarle que ahí completa sus datos, transfiere al alias *mm.kit* y sube el comprobante — todo en un paso.
-4. Una vez que lo hagan, la info llega sola a este chat y el equipo confirma el pedido.
+4. En el mismo mensaje donde mandás el link, ejecutá notificarVenta con el detalle "Cliente interesado en Kit Live Commerce derivado a landing — [nombre si lo sabés]". Así Mauro y Roberto saben que hay un potencial comprador en camino.
+5. Una vez que completen la landing, la info llega sola a este chat y Roberto confirma el pago.
 
 **NO pidas datos personales, dirección ni comprobante por WhatsApp para el Kit.** Todo eso lo maneja la landing. Solo guiá al usuario para que vaya ahí.
 
