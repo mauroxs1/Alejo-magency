@@ -12,10 +12,69 @@ import type { Action } from "../src/claude";
 
 const processedMessageIds = new Set<string>();
 
+const OUR_TEMPLATES = ["alejo_cierre_marketing", "alejo_cierre_kit"];
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") return handleVerification(req, res);
-  if (req.method === "POST") return handleIncoming(req, res);
+  if (req.method === "POST") {
+    // Detectar si es un evento de cambio de estado de template
+    const templateEvent = extractTemplateEvent(req.body);
+    if (templateEvent) return handleTemplateEvent(templateEvent, res);
+    return handleIncoming(req, res);
+  }
   return res.status(405).json({ error: "Method not allowed" });
+}
+
+interface TemplateEvent {
+  templateName: string;
+  event: string;
+  reason?: string;
+}
+
+function extractTemplateEvent(body: unknown): TemplateEvent | null {
+  try {
+    const b = body as Record<string, unknown>;
+    const entry = (b.entry as unknown[])?.[0] as Record<string, unknown>;
+    const change = (entry?.changes as unknown[])?.[0] as Record<string, unknown>;
+    if (change?.field !== "message_template_status_update") return null;
+    const value = change.value as Record<string, unknown>;
+    return {
+      templateName: value.message_template_name as string,
+      event: value.event as string,
+      reason: value.reason as string | undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function handleTemplateEvent(ev: TemplateEvent, res: VercelResponse) {
+  console.log(`Template event: ${ev.templateName} → ${ev.event}`);
+
+  if (ev.event === "APPROVED" && OUR_TEMPLATES.includes(ev.templateName)) {
+    const mauro = process.env.MAURO_PHONE!;
+    const roberto = process.env.ROBERTO_PHONE!;
+    const msg =
+      `✅ *Alejo ya puede notificarte sin restricciones*\n\n` +
+      `El template *${ev.templateName}* fue aprobado por Meta.\n\n` +
+      `A partir de ahora, cuando se cierre una venta, te llega la notificación automáticamente — sin importar cuándo fue el último mensaje. 🚀`;
+    await Promise.allSettled([
+      sendTextMessage(mauro, msg),
+      sendTextMessage(roberto, msg),
+    ]);
+  }
+
+  if (ev.event === "REJECTED" && OUR_TEMPLATES.includes(ev.templateName)) {
+    const mauro = process.env.MAURO_PHONE!;
+    const msg =
+      `⚠️ *Template rechazado por Meta*\n\n` +
+      `Nombre: ${ev.templateName}\n` +
+      `Motivo: ${ev.reason ?? "sin detalle"}\n\n` +
+      `Avisale a tu desarrollador para revisarlo.`;
+    await sendTextMessage(mauro, msg);
+  }
+
+  return res.status(200).json({ status: "ok" });
 }
 
 function handleVerification(req: VercelRequest, res: VercelResponse) {
