@@ -14,17 +14,27 @@
     {
       "src": "api/privacy.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/send-prospects.ts",
+      "use": "@vercel/node",
+      "config": { "maxDuration": 60 }
     }
   ],
   "routes": [
     { "src": "/api/webhook", "dest": "/api/webhook.ts" },
     { "src": "/api/weekly-report", "dest": "/api/weekly-report.ts" },
-    { "src": "/api/privacy", "dest": "/api/privacy.ts" }
+    { "src": "/api/privacy", "dest": "/api/privacy.ts" },
+    { "src": "/api/send-prospects", "dest": "/api/send-prospects.ts" }
   ],
   "crons": [
     {
       "path": "/api/weekly-report",
       "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/send-prospects",
+      "schedule": "0 14 * * 1-5"
     }
   ]
 }

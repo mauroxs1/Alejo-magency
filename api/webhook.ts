@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
+import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyAiAgentSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
 import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
@@ -18,7 +18,7 @@ const redis = new Redis({
 
 const processedMessageIds = new Set<string>();
 
-const OUR_TEMPLATES = ["alejo_cierre_marketing", "alejo_cierre_kit"];
+const OUR_TEMPLATES = ["alejo_cierre_marketing", "alejo_cierre_kit", "alejo_cierre_agente_ai"];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") return handleVerification(req, res);
@@ -367,7 +367,20 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           notas: action.notas ?? "", createdAt: Date.now(),
         });
       } else if (action.type === "notificarVenta") {
-        await notifySaleToTeam(action.detalle ?? "Sin detalle", fromPhone);
+        const detalle = action.detalle ?? "";
+        const nombre = action.nombre ?? "Cliente";
+        const telefono = action.telefono ?? fromPhone;
+        const rubro = action.rubro ?? "—";
+        const plan = action.planUpsell ?? detalle;
+
+        // Enrutar al template correcto según el tipo de venta
+        if (/agente ai|ai starter|ai full/i.test(detalle + plan)) {
+          await notifyAiAgentSaleToTeam(nombre, telefono, rubro, plan || detalle);
+        } else if (/kit live commerce|kit/i.test(detalle)) {
+          await notifyKitSaleToTeam(nombre, telefono, rubro || "Mendoza");
+        } else {
+          await notifySaleToTeam(nombre, telefono, rubro, plan || detalle);
+        }
       }
     } catch (error) {
       console.error(`Error ejecutando acción ${action.type}:`, error);

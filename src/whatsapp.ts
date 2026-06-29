@@ -75,31 +75,50 @@ async function sendTemplate(
   );
 }
 
-export async function notifySaleToTeam(detail: string, clientPhone: string): Promise<void> {
-  const mauro = process.env.MAURO_PHONE;
-  const roberto = process.env.ROBERTO_PHONE;
-  const targets = [mauro, roberto].filter(Boolean) as string[];
-
-  // Intentar con template primero (sin restricción 24h), fallback a texto normal
+// Template: "Alejo registro un nuevo cierre de marketing. Cliente: {{1}}, telefono {{2}}, rubro {{3}}, plan contratado {{4}}."
+export async function notifySaleToTeam(
+  nombreCliente: string,
+  telefono: string,
+  rubro: string,
+  plan: string
+): Promise<void> {
+  const targets = [process.env.MAURO_PHONE, process.env.ROBERTO_PHONE].filter(Boolean) as string[];
   await Promise.allSettled(
     targets.map(to =>
-      sendTemplate(to, "alejo_cierre_marketing", [clientPhone, clientPhone, "—", detail])
-        .catch(() => sendTextMessage(to, `🔔 *Venta cerrada por Alejo*\n\nCliente: ${clientPhone}\nDetalle: ${detail}`))
+      sendTemplate(to, "alejo_cierre_marketing", [nombreCliente, telefono, rubro, plan])
+        .catch(() => sendTextMessage(to,
+          `🔔 *Cierre de Marketing — Alejo*\n\n👤 ${nombreCliente}\n📱 ${telefono}\n🏢 Rubro: ${rubro}\n📦 Plan: ${plan}`
+        ))
     )
   );
 }
 
+// Template: "Alejo registro una venta del Kit Live Commerce. Cliente: {{1}}, telefono {{2}}, ciudad {{3}}. Monto $299.000 confirmado por Roberto."
 export async function notifyKitSaleToTeam(
   nombre: string, telefono: string, ciudad: string
 ): Promise<void> {
-  const mauro = process.env.MAURO_PHONE;
-  const roberto = process.env.ROBERTO_PHONE;
-  const targets = [mauro, roberto].filter(Boolean) as string[];
-
+  const targets = [process.env.MAURO_PHONE, process.env.ROBERTO_PHONE].filter(Boolean) as string[];
   await Promise.allSettled(
     targets.map(to =>
       sendTemplate(to, "alejo_cierre_kit", [nombre, telefono, ciudad])
-        .catch(() => sendTextMessage(to, `🛒 *Venta Kit cerrada por Alejo*\n\nCliente: ${nombre}\nTeléfono: ${telefono}\nCiudad: ${ciudad}\n💰 $299.000`))
+        .catch(() => sendTextMessage(to,
+          `🛒 *Venta Kit — Alejo*\n\n👤 ${nombre}\n📱 ${telefono}\n📍 ${ciudad}\n💰 $299.000`
+        ))
+    )
+  );
+}
+
+// Template: "Alejo cerro una venta de Agente AI. Cliente: {{1}}, telefono {{2}}, rubro {{3}}, plan elegido: {{4}}."
+export async function notifyAiAgentSaleToTeam(
+  nombre: string, telefono: string, rubro: string, plan: string
+): Promise<void> {
+  const targets = [process.env.MAURO_PHONE, process.env.ROBERTO_PHONE].filter(Boolean) as string[];
+  await Promise.allSettled(
+    targets.map(to =>
+      sendTemplate(to, "alejo_cierre_agente_ai", [nombre, telefono, rubro, plan])
+        .catch(() => sendTextMessage(to,
+          `🤖 *Venta Agente AI — Alejo*\n\n👤 ${nombre}\n📱 ${telefono}\n🏢 Rubro: ${rubro}\n📦 Plan: ${plan}`
+        ))
     )
   );
 }
