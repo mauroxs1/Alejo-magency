@@ -7,7 +7,7 @@ import { analyzeReceipt } from "../src/analyzeReceipt";
 import { savePendingSale, getPendingSale, clearPendingSale, isTeamMember, isConfirmation } from "../src/pendingSales";
 import { getHistory } from "../src/conversation";
 import { getUsageStats } from "../src/credits";
-import { logWeeklySale, logWeeklyLead } from "../src/weeklyLog";
+import { logWeeklySale, logWeeklyLead, logWeeklyAiAgent, logWeeklyConsulta } from "../src/weeklyLog";
 import type { Action } from "../src/claude";
 import { Redis } from "@upstash/redis";
 
@@ -333,24 +333,36 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           tipoLead: action.tipoLead, rubro: action.rubro, instagram: action.instagram,
           planUpsell: action.planUpsell, estado: action.estado, observaciones: action.observaciones,
         });
-        // Loguear cierre de marketing para reporte semanal
+        const nombre = action.nombre ?? "Sin nombre";
+        const telefono = action.telefono ?? fromPhone;
+        const rubro = action.rubro ?? "—";
+        const plan = action.planUpsell ?? "—";
+        const esAI = /agente ai/i.test(action.tipoLead ?? "");
+
+        if (action.estado === "Venta Cerrada") {
+          if (esAI) {
+            logWeeklyAiAgent({ nombre, telefono, rubro, plan }).catch(() => {});
+          } else {
+            logWeeklyLead({ nombre, telefono, rubro, plan }).catch(() => {});
+          }
+        } else if (action.estado === "Interesado") {
+          logWeeklyConsulta({ nombre, telefono, rubro, interes: plan }).catch(() => {});
+        }
+      } else if (action.type === "updateLead") {
+        await updateLead(action.telefono ?? fromPhone, action.estado, action.observaciones);
         if (action.estado === "Venta Cerrada") {
           logWeeklyLead({
-            nombre: action.nombre ?? "Sin nombre",
+            nombre: action.nombre ?? "—",
             telefono: action.telefono ?? fromPhone,
             rubro: action.rubro ?? "—",
             plan: action.planUpsell ?? "—",
           }).catch(() => {});
-        }
-      } else if (action.type === "updateLead") {
-        await updateLead(action.telefono ?? fromPhone, action.estado, action.observaciones);
-        // Loguear si se marca como venta cerrada
-        if (action.estado === "Venta Cerrada") {
-          logWeeklyLead({
-            nombre: "Cliente",
+        } else if (action.estado === "Interesado") {
+          logWeeklyConsulta({
+            nombre: action.nombre ?? "—",
             telefono: action.telefono ?? fromPhone,
-            rubro: "—",
-            plan: "—",
+            rubro: action.rubro ?? "—",
+            interes: action.planUpsell ?? action.observaciones ?? "—",
           }).catch(() => {});
         }
       } else if (action.type === "registerSale") {
