@@ -108,6 +108,23 @@ export async function notifyKitSaleToTeam(
   );
 }
 
+export async function notifyKitInterest(
+  nombre: string,
+  telefono: string,
+  rubro: string,
+  resumenConversacion: string
+): Promise<void> {
+  const targets = [process.env.MAURO_PHONE, process.env.ROBERTO_PHONE].filter(Boolean) as string[];
+  const msg =
+    `👀 *Cliente interesado en Kit Live Commerce*\n\n` +
+    `👤 *${nombre}*\n` +
+    `📱 ${telefono}\n` +
+    `🏢 Rubro: ${rubro}\n\n` +
+    `💬 *Resumen de la conversación:*\n${resumenConversacion}\n\n` +
+    `_Todavía no compró — está evaluando._`;
+  await Promise.allSettled(targets.map(to => sendTextMessage(to, msg)));
+}
+
 // Template: "Alejo cerro una venta de Agente AI. Cliente: {{1}}, telefono {{2}}, rubro {{3}}, plan elegido: {{4}}."
 export async function notifyAiAgentSaleToTeam(
   nombre: string, telefono: string, rubro: string, plan: string

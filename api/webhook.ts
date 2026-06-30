@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyAiAgentSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
+import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyKitInterest, notifyAiAgentSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
 import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
@@ -385,11 +385,16 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
         const rubro = action.rubro ?? "—";
         const plan = action.planUpsell ?? detalle;
 
-        // Enrutar al template correcto según el tipo de venta
         if (/agente ai|ai starter|ai full/i.test(detalle + plan)) {
           await notifyAiAgentSaleToTeam(nombre, telefono, rubro, plan || detalle);
         } else if (/kit live commerce|kit/i.test(detalle)) {
-          await notifyKitSaleToTeam(nombre, telefono, rubro || "Mendoza");
+          // Armar resumen de conversación con los últimos mensajes
+          const history = await getHistory(fromPhone).catch(() => []);
+          const resumen = history.slice(-6).map((m) => {
+            const texto = typeof m.content === "string" ? m.content : (m.content as Array<{type:string;text?:string}>).filter(b => b.type === "text").map(b => b.text ?? "").join(" ");
+            return `${m.role === "user" ? "Cliente" : "Alejo"}: ${texto}`;
+          }).join("\n");
+          await notifyKitInterest(nombre, telefono, rubro, resumen || detalle);
         } else {
           await notifySaleToTeam(nombre, telefono, rubro, plan || detalle);
         }
