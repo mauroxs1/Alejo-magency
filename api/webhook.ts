@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyKitInterest, notifyAiAgentSaleToTeam, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
+import { extractMessage, sendTextMessage, notifySaleToTeam, notifyKitSaleToTeam, notifyKitInterest, notifyAiAgentSaleToTeam, notifyOfflinePurchase, notifyPendingSale, downloadMedia, downloadAudio } from "../src/whatsapp";
 import { getAlejosReply } from "../src/claude";
 import { addLead, updateLead, registerSale } from "../src/sheets";
 import { transcribeAudio } from "../src/transcribe";
@@ -378,6 +378,12 @@ async function runActions(actions: Action[], fromPhone: string): Promise<void> {
           mapLink: action.mapLink ?? "", monto: action.monto ?? "299000",
           notas: action.notas ?? "", createdAt: Date.now(),
         });
+      } else if (action.type === "derivarCompraFisica") {
+        const nombre = action.nombre ?? "Cliente";
+        const telefono = action.telefono ?? fromPhone;
+        const rubro = action.rubro ?? "—";
+        const motivo = action.motivo ?? "Prefiere no pagar online";
+        await notifyOfflinePurchase(nombre, telefono, rubro, motivo);
       } else if (action.type === "notificarVenta") {
         const detalle = action.detalle ?? "";
         const nombre = action.nombre ?? "Cliente";

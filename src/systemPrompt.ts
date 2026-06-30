@@ -253,6 +253,10 @@ El Kit incluye Kit físico + Curso online, todo por $299.000. Son inseparables, 
 
 **NO pidas datos personales, dirección ni comprobante por WhatsApp para el Kit.** Todo eso lo maneja la landing. Solo guiá al usuario para que vaya ahí.
 
+**Si el cliente dice que NO quiere pagar online / prefiere pagar en efectivo / quiere comprar de otra forma:**
+Respondele algo como: _"¡No hay problema! Voy a avisarle a Mauro o Roberto del equipo para que te contacten directamente y coordinen la compra como más te quede cómodo."_
+Y ejecutá la acción "derivarCompraFisica" con su nombre, teléfono, rubro y motivo. Mauro o Roberto lo van a llamar para cerrar la venta de forma alternativa.
+
 ## KIT LIVE COMMERCE — PEDIDOS DESDE LA LANDING
 Cuando recibas un mensaje con este formato exacto (lo genera automáticamente la landing, NO lo escribe la persona):
 
@@ -358,6 +362,7 @@ Cuando necesites ejecutar acciones del sistema (registrar lead, notificar venta)
   {"type": "addLead", "nombre": "...", "telefono": "...", "tipoLead": "Kit|Marketing|Consulta", "rubro": "...", "instagram": "...", "planUpsell": "...", "estado": "Nuevo|En conversación|Interesado|Venta Cerrada|Sin interés", "observaciones": "..."},
   {"type": "updateLead", "telefono": "...", "estado": "...", "observaciones": "..."},
   {"type": "notificarVenta", "nombre": "nombre completo del cliente", "telefono": "teléfono del cliente", "rubro": "rubro del negocio", "planUpsell": "plan/producto contratado y monto", "detalle": "descripción completa del cierre"},
+  {"type": "derivarCompraFisica", "nombre": "...", "telefono": "...", "rubro": "...", "motivo": "razón por la que no quiere pagar online"},
   {"type": "registerSale", "nombre": "...", "apellido": "...", "dni": "...", "whatsapp": "...", "email": "...", "calle": "...", "ciudad": "...", "provincia": "...", "referencia": "...", "tipoEnvio": "domicilio|local", "nombreLocal": "...", "mapLink": "...", "monto": "299000", "alias": "mm.kit", "comprobanteOk": "Si|No", "notas": "..."}
 ]}
 

@@ -13,7 +13,7 @@ export interface ParsedResponse {
 }
 
 export interface Action {
-  type: "addLead" | "updateLead" | "notificarVenta" | "registerSale";
+  type: "addLead" | "updateLead" | "notificarVenta" | "registerSale" | "derivarCompraFisica";
   nombre?: string;
   apellido?: string;
   telefono?: string;
@@ -38,6 +38,7 @@ export interface Action {
   alias?: string;
   comprobanteOk?: string;
   notas?: string;
+  motivo?: string;
 }
 
 export async function getAlejosReply(

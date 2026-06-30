@@ -140,6 +140,23 @@ export async function notifyAiAgentSaleToTeam(
   );
 }
 
+export async function notifyOfflinePurchase(
+  nombre: string,
+  telefono: string,
+  rubro: string,
+  motivo: string
+): Promise<void> {
+  const targets = [process.env.MAURO_PHONE, process.env.ROBERTO_PHONE].filter(Boolean) as string[];
+  const msg =
+    `📞 *Cliente quiere comprar sin pagar online*\n\n` +
+    `👤 *${nombre}*\n` +
+    `📱 ${telefono}\n` +
+    `🏢 Rubro: ${rubro}\n\n` +
+    `💬 *Motivo:* ${motivo}\n\n` +
+    `➡️ Contactarlo para coordinar la compra de forma alternativa (transferencia directa, efectivo, etc.)`;
+  await Promise.allSettled(targets.map(to => sendTextMessage(to, msg)));
+}
+
 export interface IncomingMessage {
   from: string;
   text: string;
